@@ -1,11 +1,13 @@
+Beaker==1.9.0
 boto==2.48.0
 bottle==0.12.13
+funcsigs==1.0.2
 google-api-python-client==1.6.4
 httplib2==0.10.3
 oauth2client==4.1.2
-pkg-resources==0.0.0
 pyasn1==0.3.7
 pyasn1-modules==0.1.5
+pycrypto==2.6.1
 rsa==3.4.2
 six==1.11.0
 uritemplate==3.0.0

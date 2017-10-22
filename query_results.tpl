@@ -1,5 +1,3 @@
-%import operator
-
 <html>
 <head>
 <style>
@@ -23,9 +21,30 @@
 
 <img src="cow.jpg">
 <img src="name.png">
+<br>
+<form action="/">
+  <input type="submit" value="Back"/>
+</form>
+<h3> Results: </h3>
 
-<form action="/" method="get"> Search: <input name="keywords" type="text" /> 
-      <input value="Submit" type="submit" /> </form>
+<p> Search for "<i>{{query}}</i>" </p>
+
+<table id="results">
+  <tr>
+    <th><b>Word</b></th>
+    <th><b>Count</b></th>
+  </tr>
+
+<%
+
+for word, count in word_count.items():
+%>
+  <tr>
+	<td>{{word}}</td>
+    <td>{{count}}</td>
+  </tr>
+  % end
+</table>
 
 <%
 if history and len(history['count']):
