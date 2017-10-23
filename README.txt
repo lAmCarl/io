@@ -1,3 +1,29 @@
+Python script for launching EC2 instance: aws_script.py
+
+Source code of frontend with Google Login API: frontend.py
+
+Public IP Address of live server: 52.70.141.11
+
+Enabled Google API: OAuth2 API
+
+Benchmark Setup:
+All benchmarking was performed on a separate AWS t2.micro instance in the same region. This benchmarking instance lives at: 34.231.37.90.
+
+The Apache benchmarking tool, ab, was used. After testing various concurrency levels, 11 was determined to be the highest stable level (ie. did not cause any time-outs during any given run). We did not attempt any improvements on this performance. This was the concurrency used while measuring resource utilization. The command used was:
+
+  $ ab -n 1000 -c 11 http://52.70.141.11/?keywords=helloworld+foo+bar
+
+For resource utilization monitoring, dstat was used, as well as vmstat for more detailed memory usage. The commands were:
+
+  $ dstat -cdn --top-cpu --top-mem --output stats.csv > /dev/null &
+  $ vmstat 1 > mem.txt &
+
+The monitoring ran in the background with outputs every second, which were piped to files. After the Apache benchmarking tool was run, the process would be brought to the foreground, then killed using <Ctrl-C>. 
+
+Results can be found in the RESULTS.pdf file.
+
+---------------------------------------------------------------------------------------
+For Lab 1:
 ################################
 Running the frontend:
   $ python frontend.py
