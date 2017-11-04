@@ -22,9 +22,9 @@
 <img src="cow.jpg">
 <img src="name.png">
 <br>
-<form action="/">
-  <input type="submit" value="Back"/>
-</form>
+<form action="/" method="get"> Search: <input name="keywords" type="text" /> 
+      <input value="Submit" type="submit" /> </form>
+
 <h3> Results: </h3>
 
 <p> Search for "<i>{{query}}</i>" </p>

@@ -30,6 +30,7 @@ def serve_png(filename):
 
 @get('/signin')
 def signin():
+#    flow = flow_from_clientsecrets("client_secret_821968399713-054upuhr0jes67did9u5jhmuadpe7g6v.apps.googleusercontent.com.json", scope='https://www.googleapis.com/auth/plus.me https://www.googleapis.com/auth/userinfo.email', redirect_uri="http://52.70.141.11.xip.io/redirect")
     flow = flow_from_clientsecrets("client_secret_821968399713-054upuhr0jes67did9u5jhmuadpe7g6v.apps.googleusercontent.com.json", scope='https://www.googleapis.com/auth/plus.me https://www.googleapis.com/auth/userinfo.email', redirect_uri="http://localhost:8080/redirect")
     uri = flow.step1_get_authorize_url()
     redirect(str(uri))
@@ -84,7 +85,7 @@ def index():
                     recents.pop()
                 recents.insert(0, w)
                 history_db[user]['recent'] = recents
-        return template('parse_query', user=user, query = keywords, word_count = word_count, history=history_db.get(user, None))
+        return template('query_results', user=user, query = keywords, word_count = word_count, history=history_db.get(user, None))
     else:
         return template('query_page', user=user, history=history_db.get(user, None))
 
@@ -93,10 +94,12 @@ def redirect_page():
     s = request.environ.get('beaker.session')
     code = request.query.get('code', '')
     
+#    flow = flow_from_clientsecrets("client_secret_821968399713-054upuhr0jes67did9u5jhmuadpe7g6v.apps.googleusercontent.com.json",
+#                                   scope='https://www.googleapis.com/auth/plus.me https://www.googleapis.com/auth/userinfo.email',
+#                                    redirect_uri="http://52.70.141.11.xip.io/redirect")
     flow = flow_from_clientsecrets("client_secret_821968399713-054upuhr0jes67did9u5jhmuadpe7g6v.apps.googleusercontent.com.json",
                                     scope='https://www.googleapis.com/auth/plus.me https://www.googleapis.com/auth/userinfo.email',
                                     redirect_uri="http://localhost:8080/redirect")
-    
     credentials = flow.step2_exchange(code)
     token = credentials.id_token['sub']
     
@@ -116,4 +119,5 @@ def redirect_page():
     s.save()
     redirect('/')
 
-run(app=app)
+#run(app=app, host='0.0.0.0', port=80)
+run(app=app, host='localhost', port=8080)
