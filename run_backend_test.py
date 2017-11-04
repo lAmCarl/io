@@ -1,6 +1,7 @@
 import multiprocessing
 import time
 import redis
+import pprint
 from crawler import crawler
 from bottle import route, run, template
 
@@ -23,17 +24,12 @@ def server():
 
 def tester():
     bot = crawler(None, "urls.txt")
-    bot.crawl(depth=1)
-    r_server = redis.Redis(host="localhost", port=6379)
-    inverted_index = bot.get_inverted_index()
-    resolved_inverted_index = bot.get_resolved_inverted_index()
+    bot.crawl(depth=3)
     
-    for word_id in inverted_index:
-        doc_ids = r_server.zrange("word_id:%d:doc_ids" % word_id, 0, -1)
-        docs = r_server.mget(doc_ids)
-        print doc_ids
-        print docs
-
+    myList = [(doc, bot.get_score(doc_id)) for doc_id,doc in bot._doc_cache.items()]
+    myList.sort(reverse=True, key= lambda x: x[1])
+    pprint.pprint(myList)
+        
     return
 
 if __name__ == "__main__":
@@ -50,3 +46,4 @@ if __name__ == "__main__":
     p1.join()
     p2.join()
     
+

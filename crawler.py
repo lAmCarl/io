@@ -22,7 +22,11 @@ import urllib2
 import urlparse
 from BeautifulSoup import *
 from collections import defaultdict
+from pagerank import page_rank
+import redis
 import re
+import threading
+import time
 
 def attr(elem, attr):
     """An html attribute from an html element. E.g. <a href="">, then
@@ -53,6 +57,8 @@ class crawler(object):
         #dicts for doc->word and vice-versa
         self._doc_to_word = { }
         self._inverted_index = { }
+        self._links = set()
+        self._scores = { }
 
         # functions to call when entering and exiting specific tags
         self._enter = defaultdict(lambda *a, **ka: self._visit_ignore)
@@ -186,7 +192,7 @@ class crawler(object):
     def add_link(self, from_doc_id, to_doc_id):
         """Add a link into the database, or increase the number of links between
         two pages in the database."""
-        # TODO
+        self._links.add((from_doc_id, to_doc_id))
 
     def _visit_title(self, elem):
         """Called when visiting the <title> tag."""
@@ -301,6 +307,10 @@ class crawler(object):
             # text (text, cdata, comments, etc.)
             else:
                 self._add_text(tag)
+    
+    def crawl_threaded(self, depth=2, timeout=3):
+        seen = set()
+        
 
     def crawl(self, depth=2, timeout=3):
         """Crawl the web!"""
@@ -334,6 +344,7 @@ class crawler(object):
                 self._curr_words = [ ]
                 self._index_document(soup)
                 self._add_words_to_document()
+                
                 print "    url="+str(self._curr_url)
 
             except Exception as e:
@@ -343,6 +354,8 @@ class crawler(object):
                 if socket:
                     socket.close()
         self._invert_index()
+        self._scores = page_rank(self._links)
+        self._store_data()
     
     #creates an inverted index of the doc_to_word dict
     def _invert_index(self):
@@ -350,6 +363,24 @@ class crawler(object):
             for word in words:
                 self._inverted_index.setdefault(word, set()).add(doc)
     
+    def _store_data(self):
+        r_server = redis.Redis(host="localhost", port=6379)
+        for doc_id in self._doc_to_word:
+            r_server.set("doc_id:%d:doc" % doc_id, self._doc_cache[doc_id])
+            r_server.set("doc:%s:doc_id" % self._doc_cache[doc_id], doc_id)
+            r_server.set("doc_id:%d:score" % doc_id, self._scores[doc_id])
+            r_server.delete("doc_id:%d:word_ids" % doc_id)
+            for word_id in self._doc_to_word[doc_id]:
+                r_server.sadd("doc_id:%d:word_ids" % doc_id, word_id)
+
+        for word_id in self._inverted_index:
+            r_server.set("word_id:%d:word" % word_id, self._word_cache[word_id])
+            r_server.set("word:%s:word_id" % self._word_cache[word_id], word_id)
+            r_server.delete("word_id:%d:doc_ids" % word_id)
+            for doc_id in self._inverted_index[word_id]:
+                r_server.zadd("word_id:%d:doc_ids" % word_id, doc_id, self._scores[doc_id])
+        
+        
     def get_inverted_index(self):
         return self._inverted_index
     
@@ -360,6 +391,10 @@ class crawler(object):
             for doc in docs:
                 inv.setdefault(self._word_cache[word], set()).add(self._doc_cache[doc])
         return inv
+    
+    def get_score(self, doc_id):
+        return self._scores[doc_id]
+    
 
 if __name__ == "__main__":
     bot = crawler(None, "urls.txt")
