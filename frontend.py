@@ -1,15 +1,17 @@
 import bottle
-from bottle import get, post, request, run, route, template, response, static_file, redirect, app
+from bottle import get, post, request, run, route, template, response, static_file, redirect, app, error, abort
 from oauth2client.client import flow_from_clientsecrets
 from googleapiclient.errors import HttpError
 from googleapiclient.discovery import build
 from collections import OrderedDict
 from beaker.middleware import SessionMiddleware
 import httplib2
+import redis
 
 auth_db = {}
 history_db = {}
-signedin = False
+docs = []
+word_count = OrderedDict()
 
 session_opts = {
         'session.type': 'cookie',
@@ -20,6 +22,10 @@ session_opts = {
 }
 app = SessionMiddleware(app(), session_opts)
 
+@error(404)
+def error404(error):
+    return template('error404')
+
 @route('/<filename:re:.*\.jpg>')
 def serve_jpg(filename):
         return static_file(filename, root='./', mimetype='image/jpg')
@@ -27,6 +33,10 @@ def serve_jpg(filename):
 @get('/<filename:re:.*\.png>')
 def serve_png(filename):
         return static_file(filename, root='./', mimetype='image/png')
+
+@get('/<filename:re:.*\.css>')
+def stylesheets(filename):
+    return static_file(filename, root='./')
 
 @get('/signin')
 def signin():
@@ -47,11 +57,9 @@ def signout():
 def index():
     s = request.environ.get('beaker.session')
     keywords = request.query.keywords
-    
+    global docs
     user = s.get('user', None)
     token = s.get('token', None)
-    if token:
-        print "session token:"+token
     
     if user and user in auth_db and auth_db[user][0] == token:
         credentials = auth_db[user][1]
@@ -65,29 +73,41 @@ def index():
         users_service = build('oauth2', 'v2', http=http)
         user_document = users_service.userinfo().get().execute()
         user_name = user_document['name']
-    elif user and user in auth_db:
-        print "server token:" + auth_db[user][0]
 
+    r_server = redis.Redis(host="localhost", port=6379)
     if keywords:
-        word_count = OrderedDict()
-        words = keywords.split()
-        #increment keywords in current search and search history
-        for w in words:
-            word_count.setdefault(w.lower(), 0)
-            word_count[w.lower()] += 1
-            if user:
-                history_db[user]['count'].setdefault(w.lower(), 0)
-                history_db[user]['count'][w.lower()] += 1
-                recents = history_db[user]['recent']
-                if w in recents:
-                    recents.remove(w)
-                if len(recents) == 10:
-                    recents.pop()
-                recents.insert(0, w)
-                history_db[user]['recent'] = recents
-        return template('query_results', user=user, query = keywords, word_count = word_count, history=history_db.get(user, None))
+        url = "?" + request.query_string
+        page = request.query.page
+        if not page:
+            # redirect to page 1
+            # get all urls from database matching first word in query
+            url += "&page=1"
+            word_count.clear()
+            words = keywords.split()
+            word_id = r_server.get("word:%s:word_id" %words[0])
+            doc_ids = r_server.zrevrange("word_id:%s:doc_ids" %word_id, 0, -1)
+            docs = [r_server.get("doc_id:%s:doc" %doc_id) for doc_id in doc_ids]
+
+            #increment keywords in current search and search history
+            for w in words:
+                word_count.setdefault(w.lower(), 0)
+                word_count[w.lower()] += 1
+                if user:
+                    history_db[user]['count'].setdefault(w.lower(), 0)
+                    history_db[user]['count'][w.lower()] += 1
+                    recents = history_db[user]['recent']
+                    if w in recents:
+                        recents.remove(w)
+                    if len(recents) == 10:
+                        recents.pop()
+                    recents.insert(0, w)
+                    history_db[user]['recent'] = recents
+
+            redirect(url)
+        url = url.split('&')[0]
+        return template('query_results', page = int(page), url = url, docs = docs, user = user, query = keywords, word_count = word_count, history = history_db.get(user, None))
     else:
-        return template('query_page', user=user, history=history_db.get(user, None))
+        return template('query_page', user = user, history = history_db.get(user, None))
 
 @route('/redirect')
 def redirect_page():
