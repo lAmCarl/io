@@ -1,84 +1,138 @@
 <html>
 <head>
+<link rel="stylesheet" type="text/css" href="query_style.css">
+
 <style>
-	th, td {
-		padding: 10px;
-	}
+  .center {
+    display: inline-block;
+    width: 80%;
+    padding: 50px 0px;
+    text-align: left;
+  }
 </style>
 </head>
 <body>
 
-% if user:
-  <h3>{{user}}</h3>
-  <form action="/signout">
-    <input type="submit" value="Signout"/>
-  </form>
-% else:
-  <form action="/signin">
-    <input type="submit" value="Signin"/>
-  </form>
-% end
-
-<img src="cow.jpg">
-<img src="name.png">
+<!-- Colour-blocked logo, search bar and sign-in/sign-out button -->
+<div class="bar">
+  <div class="left">
+    <a href="/">
+      <img src="cow.png" alt="Cow Logo" title="Return to homepage" align="left" width="118" height="164" style="padding-right:20px;"> </a>
+    <div class="center">
+      <form action="/" method="get"> <input name="keywords" type="text" placeholder="Search..."/> 
+            <input value="Submit" type="submit" /> </form>
+    </div>
+    <div class="right">
+    % if user:
+      <h3>{{user}}</h3>
+      <form action="/signout">
+        <input type="submit" value="Signout"/>
+      </form>
+    % else:
+      <form action="/signin">
+        <input type="submit" value="Signin"/>
+      </form>
+    % end
+    </div>
+  </div>
+</div>
 <br>
-<form action="/">
-  <input type="submit" value="Back"/>
-</form>
-<h3> Results: </h3>
+<!-- Search results, 5 URLs per page -->
+<div class="left">
+  <h3> Search for "<i>{{query}}</i>" </h3>
 
-<p> Search for "<i>{{query}}</i>" </p>
-
-<table id="results">
-  <tr>
-    <th><b>Word</b></th>
-    <th><b>Count</b></th>
-  </tr>
-
-<%
-
-for word, count in word_count.items():
-%>
-  <tr>
-	<td>{{word}}</td>
-    <td>{{count}}</td>
-  </tr>
+  % if len(docs) == 0:
+    <p> No results found. </p>
+  <% else:
+    p_start = (page - 1) * 5
+    p_end = p_start + 5
+    if p_end > len(docs):
+      p_end = len(docs)
+    end
+    for link in docs[p_start:p_end]:
+  %>
+      <p><a href={{link}}>{{link}}</a></p>
+  %   end
   % end
-</table>
+  <!-- Word count and search history -->
+  <table id="results">
+    <tr>
+      <th><b>Word</b></th>
+      <th><b>Count</b></th>
+    </tr>
 
-<%
-if history and len(history['count']):
-  ord_history = sorted(history['count'].items(), key=lambda x: x[1])
-  ord_history.reverse()
-%>
+  <%
+  for word, count in word_count.items():
+  %>
+    <tr>
+  	<td>{{word}}</td>
+      <td>{{count}}</td>
+    </tr>
+    % end
+  </table>
 
-<h3> Top Twenty Keywords: </h3>
-<table id="history">
-  <tr>
-    <th><b>Word</b></th>
-    <th><b>Count</b></th>
-  </tr>
-<%
-  for i in range(min(len(ord_history),20)):
-%>
-  <tr>
-	<td>{{ord_history[i][0]}}</td>
-    <td>{{ord_history[i][1]}}</td>
-  </tr>
+  <%
+  if history and len(history['count']):
+    ord_history = sorted(history['count'].items(), key=lambda x: x[1])
+    ord_history.reverse()
+  %>
+
+  <h3> Top Twenty Keywords: </h3>
+  <table id="history">
+    <tr>
+      <th><b>Word</b></th>
+      <th><b>Count</b></th>
+    </tr>
+  <%
+    for i in range(min(len(ord_history),20)):
+  %>
+    <tr>
+  	<td>{{ord_history[i][0]}}</td>
+      <td>{{ord_history[i][1]}}</td>
+    </tr>
+    % end
+  </table>
+
+  <h3> Recent Searches: </h3>
+  <table id="recents">
+    <tr>
+      <th><b>Word</b></th>
+    </tr>
+  <% for word in history['recent']:%>
+    <tr>
+    <td>{{word}}</td>
+    </tr>
+    % end
+  </table>
   % end
-</table>
 
-<h3> Recent Searches: </h3>
-<table id="recents">
-  <tr>
-    <th><b>Word</b></th>
-  </tr>
-<% for word in history['recent']:%>
-  <tr>
-  <td>{{word}}</td>
-  </tr>
-  % end
-</table>
-% end
+<!-- Page navigation -->
+  <div class="pagination">
+    <%
+    num_pages = len(docs)/5
+    if len(docs) % 5:
+      num_pages += 1
+    end
+    if page > 1:
+      link = url + "&page=" + str(page-1)
+    %>
+    <a href={{link}}>&laquo; <span>Previous</span></a>
+    % end
+    <% for i in range(1,num_pages+1):
+      link = url + "&page=" + str(i)
+      if i == page:
+    %>
+        <a class="active" href={{link}}>{{i}}</a>
+      % else:
+        <a href={{link}}>{{i}}</a>
+      % end
+    % end
+    <% if page < num_pages:
+        link = url + "&page=" + str(page+1)
+    %>
+      <a href={{link}}> <span>Next</span> &raquo; </a>
+    % end
+  </div>
+</div>
 </body>
 </html>

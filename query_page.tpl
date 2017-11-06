@@ -1,32 +1,32 @@
-%import operator
-
 <html>
 <head>
-<style>
-	th, td {
-		padding: 10px;
-	}
-</style>
+  <link rel="stylesheet" type="text/css" href="/query_style.css">
 </head>
 <body>
 
-% if user:
-  <h3>{{user}}</h3>
-  <form action="/signout">
-    <input type="submit" value="Signout"/>
-  </form>
-% else:
-  <form action="/signin">
-    <input type="submit" value="Signin"/>
-  </form>
-% end
+<!-- Sign-in/sign-out button -->
+<div class="right">
+  % if user:
+    <h3>{{user}}</h3>
+    <form action="/signout">
+      <input type="submit" value="Sign-out"/>
+    </form>
+  % else:
+    <form action="/signin">
+      <input type="submit" value="Sign-in"/>
+    </form>
+  % end
+</div>
+<!-- Logo and search bar -->
+<div class="center">
+  <img src="cow.png" alt="Cow Logo" align="middle">
+  <img src="name.png" alt="Io" align="middle">
 
-<img src="cow.jpg">
-<img src="name.png">
+  <form action="/" method="get"> <input name="keywords" type="text" placeholder="Search..."/> 
+        <input value="Submit" type="submit" /> </form>
+</div>
 
-<form action="/" method="get"> Search: <input name="keywords" type="text" /> 
-      <input value="Submit" type="submit" /> </form>
-
+<!-- Search history, for sign-in only -->
 <%
 if history and len(history['count']):
   ord_history = sorted(history['count'].items(), key=lambda x: x[1])
