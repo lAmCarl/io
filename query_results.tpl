@@ -44,12 +44,7 @@
   % if len(docs) == 0:
     <p> No results found. </p>
   <% else:
-    p_start = (page - 1) * 5
-    p_end = p_start + 5
-    if p_end > len(docs):
-      p_end = len(docs)
-    end
-    for link in docs[p_start:p_end]:
+    for link in docs:
   %>
       <p><a href={{link}}>{{link}}</a></p>
   %   end
@@ -109,8 +104,8 @@
 <!-- Page navigation -->
   <div class="pagination">
     <%
-    num_pages = len(docs)/5
-    if len(docs) % 5:
+    num_pages = zlen/5
+    if zlen % 5:
       num_pages += 1
     end
     if page > 1:
