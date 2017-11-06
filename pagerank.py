@@ -18,7 +18,7 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 # THE SOFTWARE.
 
-def page_rank(links, num_iterations=20, initial_pr=1.0):
+def page_rank(links, max_depth=5, num_iterations=20, initial_pr=1.0):
     from collections import defaultdict
     import numpy as np
 
@@ -26,24 +26,28 @@ def page_rank(links, num_iterations=20, initial_pr=1.0):
     num_outgoing_links = defaultdict(float)
     incoming_link_sets = defaultdict(set)
     incoming_links = defaultdict(lambda: np.array([]))
+    pages = set()
     damping_factor = 0.85
 
     # collect the number of outbound links and the set of all incoming documents
     # for every document
-    for (from_id,to_id) in links:
+    for (from_id,to_id,depth) in links:
         num_outgoing_links[int(from_id)] += 1.0
         incoming_link_sets[to_id].add(int(from_id))
+        pages.add(from_id)
+        if (depth <= max_depth):
+            pages.add(to_id)
     
     # convert each set of incoming links into a numpy array
     for doc_id in incoming_link_sets:
         incoming_links[doc_id] = np.array([from_doc_id for from_doc_id in incoming_link_sets[doc_id]])
 
     num_documents = float(len(num_outgoing_links))
-    lead = (1.0 - damping_factor) / num_documents
+    lead = (1.0 - damping_factor)
     partial_PR = np.vectorize(lambda doc_id: page_rank[doc_id] / num_outgoing_links[doc_id])
 
     for _ in xrange(num_iterations):
-        for doc_id in num_outgoing_links:
+        for doc_id in pages:
             tail = 0.0
             if len(incoming_links[doc_id]):
                 tail = damping_factor * partial_PR(incoming_links[doc_id]).sum()
