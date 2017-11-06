@@ -1,4 +1,42 @@
-Python script for launching EC2 instance: aws_script.py
+For Lab 3:
+
+Public IP Address of live server: http://34.193.155.17/
+
+Running the backend test script:
+  $ python run_backend_test.py
+  
+This sets up a local bottle server and runs a crawler on some sites.
+Sites are linked as following:
+A -> B,C,D
+B -> C,D
+C -> D
+D -> D
+Script will then print out the pagerank scores in high->low order
+As expected, the more incoming links, the higher the score (links ranked D->A)
+
+
+Frontend Benchmark Setup and Results:
+All benchmarking was performed on a separate AWS t2.micro instance in the same region.
+
+The Apache benchmarking tool, ab, was used. After testing various concurrency levels, 11 was determined to be the highest stable level (ie. did not cause any time-outs during any given run). We did not attempt any improvements on this performance. This was the concurrency used while measuring resource utilization. The command used was:
+
+  $ ab -n 1000 -c 11 http://52.70.141.11/?keywords=toronto+foo+bar
+  
+Max # connections before drop:                    11
+Requests per second:                              129.26 [#/sec] (mean)
+Average (50%) percentile of response time (ms):   37
+99 percentile of response time (ms):              1636
+
+Compared to last lab RPS has gone down significantly (previously 977s) and response time has gone up (from 5ms avg).
+This is likely because the server now has to retrieve information from the redis server each time it gets a request,
+which increases the response time needed
+
+Bonus:
+There's also a multithreaded crawler (crawler_threaded.py) unfortunately due to lack of time, am not able to post results but if you modify run_backend_test.py and remove the prints there
+you should see improvement compared to the regular crawler
+
+-------------------------------------------------------------------------------------
+For Lab 2: Python script for launching EC2 instance: aws_script.py
 
 Source code of frontend with Google Login API: frontend.py
 
