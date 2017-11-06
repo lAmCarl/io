@@ -59,6 +59,17 @@ class crawler(object):
         self._inverted_index = { }
         self._links = set()
         self._scores = { }
+        self.MAX_THREADS = 8
+        self.seen = set()
+        self.seen_lock = threading.Lock()
+        self.queue_lock = threading.Lock()
+        self.doc_lock = threading.Lock()
+        self.word_lock = threading.Lock()
+        self.link_lock = threading.Lock()
+        self.doc_word_lock = threading.Lock()
+        self.working = (2**self.MAX_THREADS)-1
+        self.errors = 0
+        self.error_lock = threading.Lock()
         self._max_depth = 0
 
         # functions to call when entering and exiting specific tags
@@ -66,7 +77,7 @@ class crawler(object):
         self._exit = defaultdict(lambda *a, **ka: self._visit_ignore)
 
         # add a link to our graph, and indexing info to the related page
-        self._enter['a'] = self._visit_a
+        #self._enter['a'] = self._visit_a
 
         # record the currently indexed document's title an increase
         # the font size
@@ -150,8 +161,11 @@ class crawler(object):
     
     def word_id(self, word):
         """Get the word id of some specific word."""
+        self.word_lock.acquire()
         if word in self._word_id_cache:
-            return self._word_id_cache[word]
+            word_id = self._word_id_cache[word]
+            self.word_lock.release()
+            return word_id
         
         # TODO: 1) add the word to the lexicon, if that fails, then the
         #          word is in the lexicon
@@ -161,12 +175,16 @@ class crawler(object):
         word_id = self._mock_insert_word(word)
         self._word_id_cache[word] = word_id
         self._word_cache[word_id] = word
+        self.word_lock.release()
         return word_id
     
     def document_id(self, url):
         """Get the document id for some url."""
+        self.doc_lock.acquire()
         if url in self._doc_id_cache:
-            return self._doc_id_cache[url]
+            doc_id = self._doc_id_cache[url]
+            self.doc_lock.release()
+            return doc_id
         
         # TODO: just like word id cache, but for documents. if the document
         #       doesn't exist in the db then only insert the url and leave
@@ -175,6 +193,7 @@ class crawler(object):
         doc_id = self._mock_insert_document(url)
         self._doc_id_cache[url] = doc_id
         self._doc_cache[doc_id] = url
+        self.doc_lock.release()
         return doc_id
     
     def _fix_url(self, curr_url, rel):
@@ -190,10 +209,12 @@ class crawler(object):
         parsed_url = urlparse.urlparse(curr_url)
         return urlparse.urljoin(parsed_url.geturl(), rel)
 
-    def add_link(self, from_doc_id, to_doc_id):
+    def add_link(self, from_doc_id, to_doc_id, depth):
         """Add a link into the database, or increase the number of links between
         two pages in the database."""
-        self._links.add((from_doc_id, to_doc_id, self._curr_depth))
+        self.link_lock.acquire()
+        self._links.add((from_doc_id, to_doc_id, depth))
+        self.link_lock.release()
 
     def _visit_title(self, elem):
         """Called when visiting the <title> tag."""
@@ -202,10 +223,10 @@ class crawler(object):
 
         # TODO update document title for document id self._curr_doc_id
     
-    def _visit_a(self, elem):
+    def _visit_a(self, elem, curr_url, depth):
         """Called when visiting <a> tags."""
 
-        dest_url = self._fix_url(self._curr_url, attr(elem,"href"))
+        dest_url = self._fix_url(curr_url, attr(elem,"href"))
 
         #print "href="+repr(dest_url), \
         #      "title="+repr(attr(elem,"title")), \
@@ -213,24 +234,28 @@ class crawler(object):
         #      "text="+repr(self._text_of(elem))
 
         # add the just found URL to the url queue
-        self._url_queue.append((dest_url, self._curr_depth))
+        self.queue_lock.acquire()
+        self._url_queue.append((dest_url, depth))
+        self.queue_lock.release()
         
         # add a link entry into the database from the current document to the
         # other document
-        self.add_link(self._curr_doc_id, self.document_id(dest_url))
+        self.add_link(self.document_id(curr_url), self.document_id(dest_url), depth)
 
         # TODO add title/alt/text to index for destination url
     
-    def _add_words_to_document(self):
+    def _add_words_to_document(self, doc_id, curr_words):
         #       knowing self._curr_doc_id and the list of all words and their
         #       font sizes (in self._curr_words), add all the words into the
         #       database for this document
         word_id_set = set()
-        for word_id, font_size in self._curr_words:
+        for word_id in curr_words:
             word_id_set.add(word_id)
-        self._doc_to_word[self._curr_doc_id] = word_id_set
+        self.doc_word_lock.acquire()
+        self._doc_to_word[doc_id] = word_id_set
+        self.doc_word_lock.release()
             
-        print "    num words="+ str(len(self._curr_words))
+        print "    num words="+ str(len(curr_words))
 
     def _increase_font_factor(self, factor):
         """Increade/decrease the current font size."""
@@ -242,7 +267,7 @@ class crawler(object):
         """Ignore visiting this type of tag"""
         pass
 
-    def _add_text(self, elem):
+    def _add_text(self, elem, curr_words):
         """Add some text to the document. This records word ids and word font sizes
         into the self._curr_words list for later processing."""
         words = WORD_SEPARATORS.split(elem.string.lower())
@@ -250,7 +275,7 @@ class crawler(object):
             word = word.strip().encode("ascii")
             if word in self._ignored_words:
                 continue
-            self._curr_words.append((self.word_id(word), self._font_size))
+            curr_words.append(self.word_id(word))
         
     def _text_of(self, elem):
         """Get the text inside some element without any tags."""
@@ -263,7 +288,7 @@ class crawler(object):
         else:
             return elem.string
 
-    def _index_document(self, soup):
+    def _index_document(self, soup, url, depth, curr_words):
         """Traverse the document in depth-first order and call functions when entering
         and leaving tags. When we come accross some text, add it into the index. This
         handles ignoring tags that we have no business looking at."""
@@ -302,71 +327,104 @@ class crawler(object):
                     continue
                 
                 # enter the tag
-                self._enter[tag_name](tag)
+                if tag_name == 'a':
+                    self._visit_a(tag, url, depth)
+                else:
+                    self._enter[tag_name](tag)
                 stack.append(tag)
 
             # text (text, cdata, comments, etc.)
             else:
-                self._add_text(tag)
+                self._add_text(tag, curr_words)
     
-    def crawl_threaded(self, depth=2, timeout=3):
-        seen = set()
+    def crawler_thread(self, threadid, depth=2, timeout=3):
+        """Crawl the web!"""
+        while True:
+            self.queue_lock.acquire()
+            if len(self._url_queue):
+                self.working |= 2**threadid
+                url, depth_ = self._url_queue.pop()
+                self.queue_lock.release()
+
+                # skip this url; it's too deep
+                if depth_ > depth:
+                    continue
+
+                doc_id = self.document_id(url)
+
+                self.seen_lock.acquire()
+                # we've already seen this document
+                if doc_id in self.seen:
+                    self.seen_lock.release()
+                    continue
+
+                self.seen.add(doc_id) # mark this document as haven't been visited
+                self.seen_lock.release()
+                
+                socket = None
+                try:
+                    socket = urllib2.urlopen(url, timeout=timeout)
+                    soup = BeautifulSoup(socket.read())
+
+                    curr_depth = depth_ + 1
+                    curr_words = [ ]
+                    self._index_document(soup, url, curr_depth, curr_words)
+                    self._add_words_to_document(doc_id, curr_words)
+                    
+                    print "    url="+str(url)
+
+                except Exception as e:
+                    print str(e) + " url=" + str(url)
+                    self.error_lock.acquire()
+                    self.errors += 1
+                    self.error_lock.release()
+                    pass
+                finally:
+                    if socket:
+                        socket.close()
+            else:
+                self.working &= (2**self.MAX_THREADS)-(2**threadid)-1
+                if not self.working:
+                    self.queue_lock.release()
+                    break
+                self.queue_lock.release()
+                time.sleep(1)
+
         
 
     def crawl(self, depth=2, timeout=3):
         """Crawl the web!"""
-        seen = set()
-        self._max_depth = depth
-
+        threadqueue = []
         start = time.time()
-
-        while len(self._url_queue):
-
-            url, depth_ = self._url_queue.pop()
-
-            # skip this url; it's too deep
-            if depth_ > depth:
-                continue
-
-            doc_id = self.document_id(url)
-
-            # we've already seen this document
-            if doc_id in seen:
-                continue
-
-            seen.add(doc_id) # mark this document as haven't been visited
+        self._max_depth = depth
+        for i in range(self.MAX_THREADS):
+            thread = threading.Thread(target=self.crawler_thread, args=(i, depth, timeout))
+            thread.start()
+            threadqueue.append(thread)
             
-            socket = None
-            try:
-                socket = urllib2.urlopen(url, timeout=timeout)
-                soup = BeautifulSoup(socket.read())
-
-                self._curr_depth = depth_ + 1
-                self._curr_url = url
-                self._curr_doc_id = doc_id
-                self._font_size = 0
-                self._curr_words = [ ]
-                self._index_document(soup)
-                self._add_words_to_document()
-                
-                print "    url="+str(self._curr_url)
-
-            except Exception as e:
-                print e
-                pass
-            finally:
-                if socket:
-                    socket.close()
-        
+        for i in range(self.MAX_THREADS):
+            threadqueue[i].join()
+            
         mid = time.time()
         self._invert_index()
-        self._scores = page_rank(self._links, max_depth=self._max_depth, num_iterations=20)
+        invert = time.time()
+        self._scores = page_rank(self._links, depth)
+        scoring = time.time()
         self._store_data()
         end = time.time()
-        
         print "time spent crawling: %d" % (mid-start)
-        print "time spent storing: %d" % (end-mid)
-
+        print "time spent inverting: %d" % (invert-mid)
+        print "time spent scoring: %d" % (scoring-invert)
+        print "time spent storing: %d" % (end-scoring)
+        print "num errors %d" % self.errors
+        for word in sorted(self._doc_id_cache):
+            #print word
+            pass
+        links = [(self._doc_cache[x], self._doc_cache[y], d) for x,y,d in self._links]
+        for word in sorted(links):
+            if word[2] <= depth:
+                #print word
+                pass
     
     #creates an inverted index of the doc_to_word dict
     def _invert_index(self):
@@ -412,3 +470,4 @@ class crawler(object):
 if __name__ == "__main__":
     bot = crawler(None, "urls.txt")
     bot.crawl(depth=1)
+
