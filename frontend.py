@@ -104,7 +104,7 @@ def index():
         # get five results from server, with start offset by page number
         page = int(page)
         p_start = (page - 1) * 5
-        p_end = p_start + 5
+        p_end = p_start + 4
         zlen = r_server.zcount("word_id:%s:doc_ids" %word_id, -inf, +inf)
         print zlen
         if p_end > zlen:
