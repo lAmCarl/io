@@ -54,7 +54,6 @@
     % end
   </table>
 
-  <%
 <!-- Page navigation -->
   <div class="pagination">
     <%
