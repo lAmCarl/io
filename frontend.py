@@ -4,7 +4,9 @@ from collections import OrderedDict
 from beaker.middleware import SessionMiddleware
 import httplib2
 import redis
+import operator
 from numpy import inf
+import spell
 
 auth_db = {}
 history_db = {}
@@ -46,32 +48,55 @@ def index():
     if keywords:
         url = "?" + request.query_string
         page = request.query.page
-        word_count = OrderedDict()
-        words = keywords.split()
         if not page:
             # redirect to page 1
             url += "&page=1"
-            #increment keywords in current search and search history
-            for w in words:
-                word_count.setdefault(w.lower(), 0)
-                word_count[w.lower()] += 1
             redirect(url)
+
+        word_count = OrderedDict()
+        word_ids = {}
+        words = keywords.split()
+        corrected_words = []
+        doc_ids = {}
+        for w in words:
+            corrected = spell.correction(w)
+            if corrected and corrected != w:
+                corrected_words.append((corrected, True))
+            else:
+                corrected_words.append((w, False))
+            
+        doc_scores = {}
+        for w in words:
+            w_id = r_server.get("word:%s:word_id" %w)
+            doc_ids = r_server.zrevrange("word_id:%s:doc_ids" %w_id, 0, -1)
+            for doc in doc_ids:
+                score = r_server.get("doc_id:%s:score" %doc)
+                if doc in doc_scores:
+                    doc_scores[doc] *= (float(score) * 100)
+                else:
+                    doc_scores[doc] = float(score) * 100
+        
+        sorted_doc_ids = sorted(doc_scores.items(), key=operator.itemgetter(1), reverse=True)
+            
         # else page number exists
         # strip page number from url
         url = url.split('&')[0]
         # get id from server matching first word of query
-        word_id = r_server.get("word:%s:word_id" %words[0])
+        #word_id = r_server.get("word:%s:word_id" %words[0])
         # get five results from server, with start offset by page number
         page = int(page)
         p_start = (page - 1) * 5
         p_end = p_start + 4
-        zlen = r_server.zcount("word_id:%s:doc_ids" %word_id, -inf, +inf)
+        #zlen = r_server.zcount("word_id:%s:doc_ids" %word_id, -inf, +inf)
+        zlen = len(sorted_doc_ids)
         print zlen
         if p_end > zlen:
             p_end = zlen
-        doc_ids = r_server.zrevrange("word_id:%s:doc_ids" %word_id, p_start, p_end)
-        docs = [r_server.get("doc_id:%s:doc" %doc_id) for doc_id in doc_ids]
-        return template('query_results', page = page, url = url, docs = docs, zlen = zlen, query = keywords, word_count = word_count)
+        #doc_ids = r_server.zrevrange("word_id:%s:doc_ids" %word_id, p_start, p_end)
+        doc_ids = sorted_doc_ids[p_start:p_end+1]
+        docs = [r_server.get("doc_id:%s:doc" %doc_id[0]) for doc_id in doc_ids]
+        titles = [r_server.get("doc_id:%s:title" %doc_id[0]) for doc_id in doc_ids]
+        return template('query_results', page = page, url = url, docs = docs, titles=titles, zlen = zlen, query = keywords, corrected = corrected_words, word_count = word_count)
     else:
         return template('query_page')
 

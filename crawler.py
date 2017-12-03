@@ -59,6 +59,8 @@ class crawler(object):
         self._inverted_index = { }
         self._links = set()
         self._scores = { }
+        self._word_count = { }
+        self._doc_title = { }
         self._max_depth = 0
 
         # functions to call when entering and exiting specific tags
@@ -165,6 +167,9 @@ class crawler(object):
     
     def document_id(self, url):
         """Get the document id for some url."""
+        if url[-1] == '/':
+            url = url[:-1]
+        
         if url in self._doc_id_cache:
             return self._doc_id_cache[url]
         
@@ -199,6 +204,8 @@ class crawler(object):
         """Called when visiting the <title> tag."""
         title_text = self._text_of(elem).strip()
         print "document title="+ repr(title_text)
+        print "setting doc_title for " + str(self._curr_doc_id)
+        self._doc_title[self._curr_doc_id] = str(title_text)
 
         # TODO update document title for document id self._curr_doc_id
     
@@ -372,26 +379,32 @@ class crawler(object):
     def _invert_index(self):
         for doc, words in self._doc_to_word.iteritems():
             for word in words:
+                if word in self._word_count:
+                    self._word_count[word] += 1
+                else:
+                    self._word_count[word] = 1
                 self._inverted_index.setdefault(word, set()).add(doc)
     
     def _store_data(self):
         r_server = redis.Redis(host="localhost", port=6379)
+        r_server.flushall()
         print "doc_word_size %d" % len(self._doc_to_word)
         for doc_id in self._doc_to_word:
             r_server.set("doc_id:%d:doc" % doc_id, self._doc_cache[doc_id])
             r_server.set("doc:%s:doc_id" % self._doc_cache[doc_id], doc_id)
             r_server.set("doc_id:%d:score" % doc_id, self._scores[doc_id])
-            r_server.delete("doc_id:%d:word_ids" % doc_id)
-            for word_id in self._doc_to_word[doc_id]:
-                r_server.sadd("doc_id:%d:word_ids" % doc_id, word_id)
+            if doc_id in self._doc_title:
+                r_server.set("doc_id:%d:title" % doc_id, self._doc_title[doc_id])
 
         print "word_doc_size %d" % len(self._inverted_index)
         for word_id in self._inverted_index:
             r_server.set("word_id:%d:word" % word_id, self._word_cache[word_id])
             r_server.set("word:%s:word_id" % self._word_cache[word_id], word_id)
+            r_server.set("word:%s:word_count" % self._word_cache[word_id], self._word_count[word_id])
             r_server.delete("word_id:%d:doc_ids" % word_id)
             for doc_id in self._inverted_index[word_id]:
                 r_server.zadd("word_id:%d:doc_ids" % word_id, doc_id, self._scores[doc_id])
+        r_server.save()
         
         
     def get_inverted_index(self):

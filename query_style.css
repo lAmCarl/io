@@ -1,3 +1,14 @@
+div p.firstpar {
+  margin-top: 0;
+  font-size: 18px;
+  
+}
+div p.nextpar {
+  margin-top: -1em;
+  font-size: 14px;
+  color: green;
+}
+
 body {
   margin: 0;
   overflow-x: hidden;

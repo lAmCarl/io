@@ -19,7 +19,7 @@
     <a href="/">
       <img src="cow.png" alt="Cow Logo" title="Return to homepage" align="left" width="118" height="164" style="padding-right:20px;"> </a>
     <div class="center">
-      <form action="/" method="get"> <input name="keywords" type="text" placeholder="Search..."/> 
+      <form action="/" method="get"> <input name="keywords" type="text" value="{{query}}"/> 
             <input value="Submit" type="submit" /> </form>
     </div>
   </div>
@@ -27,32 +27,35 @@
 <br>
 <!-- Search results, 5 URLs per page -->
 <div class="left">
-  <h3> Search for "<i>{{query}}</i>" </h3>
+  <% if any([i[1] for i in corrected]): 
+      correct = '+'.join([i[0] for i in corrected])%>
+      % incorrect = query.replace(' ', '+')
+    <p> Did you mean <a href="/?keywords={{correct}}">
+    <% for w,c in corrected:
+      if c:%>
+      <b><i>{{w}}</i></b>
+      <% else: %>
+        {{w}} 
+    <% end
+    end %>
+    </a>?
+    <!--<br>
+    Search instead for <a href="/?keywords={{incorrect}}&page=1">{{query}}</a> -->
+    </p>
+  <% end %>
+  
 
   % if len(docs) == 0:
     <p> No results found. </p>
   <% else:
-    for link in docs:
+    for title, link in zip(titles,docs):
   %>
-      <p><a href={{link}}>{{link}}</a></p>
+      <div>
+      <p class="firstpar" ><a href={{link}}>{{title}}</a></p>
+      <p class="nextpar" >{{link}}</p>
+      </div>
   %   end
   % end
-  <!-- Word count and search history -->
-  <table id="results">
-    <tr>
-      <th><b>Word</b></th>
-      <th><b>Count</b></th>
-    </tr>
-
-  <%
-  for word, count in word_count.items():
-  %>
-    <tr>
-  	<td>{{word}}</td>
-      <td>{{count}}</td>
-    </tr>
-    % end
-  </table>
 
 <!-- Page navigation -->
   <div class="pagination">

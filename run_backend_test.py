@@ -29,7 +29,7 @@ def server():
 def tester():
     bot = crawler.crawler(None, "urls.txt")
     #bot = crawler_threaded.crawler(None, "urls.txt")
-    bot.crawl(depth=2)
+    bot.crawl(depth=1)
     
     myList = [(bot.get_score(doc_id), doc) for doc_id,doc in bot._doc_cache.items() if doc_id in bot._doc_to_word]
     myList.sort(reverse=True)
