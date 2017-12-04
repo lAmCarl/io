@@ -3,22 +3,18 @@ import redis
 from itertools import izip_longest
 from collections import Counter
 
-
-ignored_words = set([
-    'the', 'of', 'at', 'on', 'in', 'is', 'it', 'and', 'or',
-])
+#dictionary of known words
+WORDS = {}
 
 def words(text): return re.findall(r'\w+', text.lower())
 
-
 r_server = redis.Redis(host="localhost", port=6379)
-WORDS = {}
 # iterate a list in batches of size n
 def batcher(iterable, n):
     args = [iter(iterable)] * n
     return izip_longest(*args)
 
-# in batches of 500 delete keys matching user:*
+# in batches of 500, insert into known words 
 for keybatch in batcher(r_server.scan_iter('word:*:word_count'),500):
     for k in keybatch:
         if k:
@@ -26,8 +22,12 @@ for keybatch in batcher(r_server.scan_iter('word:*:word_count'),500):
             count = int(r_server.get(k))
             WORDS[w] = count
 
+#these words are ignored by the crawler but we still want to know they're spelt correctly
+ignored_words = set([
+    'the', 'of', 'at', 'on', 'in', 'is', 'it', 'and', 'or',
+])
 for w in ignored_words:
-    WORDS[w] = 1
+    WORDS[w] = 0
 
 def P(word, N=sum(WORDS.values())):
     "Probability of `word`."
