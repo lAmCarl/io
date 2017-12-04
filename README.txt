@@ -1,3 +1,23 @@
+DEPLOYING ON AWS
+To deploy the web server on an aws instance:
+  - Edit config.py with appropriate information
+  - Run $ python deployment.py
+
+After running, it will return 3 things:
+  - IP to ssh into instance
+  - DNS to access website
+  - Instance ID to terminate instance
+
+To terminate the instance, run:
+  $ python terminate.py <Instance ID>
+
+###########################################################################################
+DEPLOYING LOCALLY WITH SCRIPT
+If you are running on an Ubuntu machine, you can deploy using the install_pkgs.sh script:
+  $ sh install_pkgs.sh
+
+###########################################################################################
+MANUAL INSTALLATION AND DEPLOYMENT
 Setup and Installation:
   Programs that need to be installed beforehand:
     - pound:
