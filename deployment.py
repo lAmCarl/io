@@ -6,7 +6,7 @@ from config import *
 ec2_conn = boto.ec2.connect_to_region("us-east-1", aws_access_key_id=ACCESS_KEY_ID,
 	aws_secret_access_key=SECRET_ACCESS_KEY)
 
-#key_pair = ec2_conn.create_key_pair("opensesame")
+#key_pair = ec2_conn.create_key_pair("key_pair")
 #key_pair.save(key_path)
 #
 #security = ec2_conn.create_security_group("csc326-group55", "security group")
@@ -14,7 +14,7 @@ ec2_conn = boto.ec2.connect_to_region("us-east-1", aws_access_key_id=ACCESS_KEY_
 #security.authorize('TCP', 22, 22, '0.0.0.0/0')
 #security.authorize('TCP', 80, 80, '0.0.0.0/0')
 
-reservation = ec2_conn.run_instances('ami-9aaa1cf2', key_name='opensesame',
+reservation = ec2_conn.run_instances('ami-9aaa1cf2', key_name='key_pair',
 	instance_type='t2.micro', security_groups=["csc326-group55"])
 
 # list of instances
@@ -27,7 +27,8 @@ while inst.state == 'pending':
 	inst.update()
 
 # ensure instance is fully running before accessing variables
-time.sleep(5)
+while not inst.ip_address:
+    inst.update()
 
 print "Instance is now running"
 

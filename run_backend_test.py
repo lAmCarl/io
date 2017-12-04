@@ -39,15 +39,9 @@ def tester():
 
 if __name__ == "__main__":
     jobs = []
-    p1 = multiprocessing.Process(target=server)
-    jobs.append(p1)
     p2 = multiprocessing.Process(target=tester)
     jobs.append(p2)
-    p1.start()
-    time.sleep(1)
     p2.start()
     p2.join()
-    p1.terminate()
-    p1.join()
     
 

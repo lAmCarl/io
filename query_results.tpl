@@ -13,7 +13,7 @@
 </head>
 <body>
 
-<!-- Colour-blocked logo, search bar and sign-in/sign-out button -->
+<!-- Colour-blocked logo and search bar -->
 <div class="bar">
   <div class="left">
     <a href="/">
@@ -25,36 +25,33 @@
   </div>
 </div>
 <br>
-<!-- Search results, 5 URLs per page -->
-<div class="left">
-  <% if any([i[1] for i in corrected]): 
-      correct = '+'.join([i[0] for i in corrected])%>
-      % incorrect = query.replace(' ', '+')
-    <p> Did you mean <a href="/?keywords={{correct}}">
-    <% for w,c in corrected:
-      if c:%>
-      <b><i>{{w}}</i></b>
-      <% else: %>
-        {{w}} 
-    <% end
-    end %>
-    </a>?
-    <!--<br>
-    Search instead for <a href="/?keywords={{incorrect}}&page=1">{{query}}</a> -->
-    </p>
-  <% end %>
-  
 
+<div class="left">
+<!-- Spellchecker, suggest a "did you mean..." if any word not found, only on the first page -->
+  %if page == 1 and any([i[1] for i in corrected]): 
+    %correct = '+'.join([i[0] for i in corrected])
+    <p>Did you mean <a href="/?keywords={{correct}}">
+    %for w,c in corrected:
+      %if c:
+        <b><i>{{w}}</i></b>
+      %else:
+        {{w}} 
+      %end
+    %end
+    </a>?</p>
+  %end
+
+<!-- Search results, 5 URLs per page -->
   % if len(docs) == 0:
     <p> No results found. </p>
-  <% else:
-    for title, link in zip(titles,docs):
-  %>
+  % else:
+    % for title, link in zip(titles,docs):
       <div>
+      <!-- classes to manage size, color, and spacing for each title,link pair -->
       <p class="firstpar" ><a href={{link}}>{{title}}</a></p>
       <p class="nextpar" >{{link}}</p>
       </div>
-  %   end
+    % end
   % end
 
 <!-- Page navigation -->
