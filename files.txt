@@ -16,4 +16,3 @@ requirements.txt
 spell.py
 urls.txt
 run_backend_test.py
-test_crawler.py
